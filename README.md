@@ -1,43 +1,59 @@
-# VibeVault — DeFi Staking Dashboard on Bitcoin L1
+# 💊 PILL Flip Casino — Provably Fair Gambling on Bitcoin L1
 
-> Stake tokens, earn rewards, auto-compound — all on Bitcoin Layer 1, powered by OP_NET.
+> Flip the pill. Win or die. Every result verified on-chain via OP_NET block hashes.
 
 ![Bitcoin](https://img.shields.io/badge/Bitcoin-L1-orange?style=flat-square&logo=bitcoin&logoColor=white)
 ![OP_NET](https://img.shields.io/badge/OP__NET-Powered-blue?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-React-blue?style=flat-square&logo=typescript)
+![BOB](https://img.shields.io/badge/Built_with-BOB_MCP-purple?style=flat-square)
 
-## What is VibeVault?
+## What is PILL Flip Casino?
 
-VibeVault is a DeFi staking dashboard built for Bitcoin Layer 1 using OP_NET. It lets users:
+PILL Flip Casino is a **provably fair** coin-flip gambling game built on Bitcoin Layer 1 using OP_NET. Connect your OP_WALLET, flip the pill, and see if fate favors you — every outcome is derived from real block hashes on the OP_NET testnet, fully verifiable on [OPScan](https://testnet.opscan.org).
 
-- **Connect** their OP_WALLET to the app
-- **Stake** BTC tokens directly on Bitcoin L1
-- **Earn** staking rewards with real-time tracking
-- **Auto-Compound** rewards back into the staking vault
-- **Track** detailed analytics: APY, reward history, transaction log
+### How It Works
+
+1. **Connect** your OP_WALLET
+2. **Flip** the pill 💊
+3. **Win** (PILL 💊) or **Lose** (SKULL 💀)
+4. **Verify** — the result comes from the latest block hash
+
+### Provably Fair System
+
+The game outcome is determined by the **last hex digit** of the latest OP_NET block hash:
+
+| Hex Digit | Result |
+|-----------|--------|
+| `0–7` | 💊 **PILL** (You win!) |
+| `8–F` | 💀 **SKULL** (You lose!) |
+
+This gives a true **50/50** probability. Every block hash is publicly visible on the OP_NET testnet explorer — no hidden RNG, no server-side manipulation.
 
 Built for the **OP_NET Vibecode Challenge — Week 2: The DeFi Signal**.
 
 ## Features
 
-- **Wallet Integration** — Seamless OP_WALLET connection via `@btc-vision/walletconnect`
-- **Staking Vault** — Stake/unstake with configurable lock periods
-- **Auto-Compound** — Toggle automatic reward reinvestment
-- **Live Analytics** — Real-time charts showing reward growth over time
-- **Transaction History** — Full log of stakes, unstakes, rewards, and compounds
-- **Protocol Stats** — TVL, APY, total stakers, block height from OP_NET
-- **Dark Theme** — Professional Bitcoin-aesthetic UI with orange accents
+- **Provably Fair** — Outcomes derived from on-chain block hashes, verifiable on OPScan
+- **Wallet Integration** — OP_WALLET connection via `@btc-vision/walletconnect`
+- **Live Block Data** — Real-time block height and hash from OP_NET testnet
+- **Token Balance Loader** — Paste any OP-20 token address to check your balance
+- **Stats Tracking** — Wins, losses, current streak, best streak (persisted in localStorage)
+- **Game History** — Scrollable log of every flip with block hash proof
+- **Casino Theme** — Dark neon UI with flip animations and glowing effects
 - **Responsive** — Works on desktop and mobile
+- **Built with BOB** — Developed using the official OP_NET BOB MCP agent for correct SDK usage
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | Frontend | React 19 + TypeScript |
-| Build Tool | Vite |
+| Build Tool | Vite 7 + `vite-plugin-node-polyfills` |
 | Blockchain | OP_NET (Bitcoin L1) |
-| Wallet | OP_WALLET via `@btc-vision/walletconnect` |
-| SDK | `opnet`, `@btc-vision/bitcoin`, `@btc-vision/transaction` |
+| Network | `networks.opnetTestnet` via `@btc-vision/bitcoin@rc` |
+| SDK | `opnet@rc`, `@btc-vision/transaction@rc` |
+| Wallet | OP_WALLET via `@btc-vision/walletconnect@latest` |
+| AI Agent | BOB MCP (`https://ai.opnet.org/mcp`) |
 
 ## Getting Started
 
@@ -58,15 +74,19 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 npm run build
 ```
 
-Output goes to `dist/` — deploy to IPFS, Vercel, or any static host.
+Output goes to `dist/` — deploy to Vercel, IPFS, or any static host.
 
-## Screenshots
+## BOB MCP Integration
 
-The dashboard features:
-- Protocol overview with TVL, APY, staker count
-- Personal staking positions with lock timers
-- Cumulative reward chart with daily breakdown
-- Full transaction history with color-coded types
+This project was built using **BOB** — the official OP_NET AI coding agent. BOB provided:
+
+- Correct `rc` package versions for all OP_NET dependencies
+- Production-ready `vite.config.ts` with Node.js polyfills and aliases
+- Network configuration guidance (`networks.opnetTestnet`, NOT `networks.testnet`)
+- Provider singleton pattern with `JSONRpcProvider({ url, network })`
+- Contract interaction patterns with proper error checking
+
+BOB MCP endpoint: `https://ai.opnet.org/mcp`
 
 ## Competition
 

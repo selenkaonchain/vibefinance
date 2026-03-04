@@ -1,30 +1,34 @@
 {
-  "name": "vibevault",
+  "name": "pill-flip-casino",
   "private": true,
   "version": "1.0.0",
-  "description": "VibeVault — DeFi Staking Dashboard on Bitcoin L1 with OP_NET",
+  "description": "PILL Flip Casino — Provably fair gambling game on Bitcoin L1 with OP_NET",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "opnet": "^1.8.0",
-    "@btc-vision/bitcoin": "^6.5.6",
-    "@btc-vision/transaction": "^1.7.31",
-    "@btc-vision/walletconnect": "^1.10.3",
-    "buffer": "^6.0.3",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "recharts": "^2.15.0",
-    "lucide-react": "^0.475.0"
+    "react": "latest",
+    "react-dom": "latest",
+    "opnet": "rc",
+    "@btc-vision/transaction": "rc",
+    "@btc-vision/bitcoin": "rc",
+    "@btc-vision/walletconnect": "latest"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.0",
-    "typescript": "^5.7.0",
-    "vite": "^6.2.0"
+    "vite": "latest",
+    "@vitejs/plugin-react": "latest",
+    "vite-plugin-node-polyfills": "latest",
+    "typescript": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/node": "latest",
+    "crypto-browserify": "latest",
+    "stream-browserify": "latest"
+  },
+  "overrides": {
+    "@noble/hashes": "2.0.1"
   }
 }
