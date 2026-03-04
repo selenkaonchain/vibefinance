@@ -422,7 +422,7 @@ export function App() {
                             </code>
                             <a
                                 className="pf-link"
-                                href={`https://testnet.opscan.org/block/${bc.blockData.height}`}
+                                href={`https://opscan.org/block/${bc.blockData.height}`}
                                 target="_blank"
                                 rel="noreferrer"
                             >
