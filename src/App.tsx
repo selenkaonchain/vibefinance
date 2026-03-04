@@ -133,7 +133,22 @@ export function App() {
         setLastPayout(0);
         setTxStatus('');
 
-        // Fetch fresh block
+        // ═══ STEP 1: Take the bet — player sends PILL to house ═══
+        const betAmountRaw = BigInt(betAmount) * (10n ** BigInt(decimals));
+        try {
+            setTxStatus('💰 Sign your bet in the wallet...');
+            const txResult = await bc.transferPillToHouse(betAmountRaw);
+            setTxStatus('✅ Bet placed! Flipping...');
+            console.log('[GAME] Bet transfer complete:', txResult);
+        } catch (e: any) {
+            const msg = e?.message || 'Transfer failed';
+            setTxStatus(`❌ Bet failed: ${msg.slice(0, 80)}`);
+            console.error('[GAME] Bet transfer failed:', e);
+            setIsFlipping(false);
+            return; // Abort — bet wasn't placed
+        }
+
+        // ═══ STEP 2: Fetch block hash & determine result ═══
         const block = await bc.fetchBlockData();
 
         // Animate for 2 seconds
@@ -148,30 +163,42 @@ export function App() {
         setLastPayout(won ? betAmount : -betAmount);
         setIsFlipping(false);
 
-        // Real token transfer on LOSS
-        if (!won) {
+        // ═══ STEP 3: If won → request payout from house backend ═══
+        if (won) {
             try {
-                setTxStatus('⏳ Sign the transaction in your wallet to pay bet...');
-                const betAmountRaw = BigInt(betAmount) * (10n ** BigInt(decimals));
-                const txResult = await bc.transferPillToHouse(betAmountRaw);
-                setTxStatus(`✅ Bet paid! TX: ${txResult.slice(0, 40)}...`);
-                console.log('[GAME] Loss transfer complete:', txResult);
-                // Refresh balance
-                await bc.loadPillBalance();
+                setTxStatus('🎉 YOU WON! Requesting payout from house...');
+                const resp = await fetch('/api/payout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerAddress: bc.walletAddress,
+                        amount: betAmountRaw.toString(),
+                        blockHash: hash,
+                        blockHeight: block?.height || 0,
+                        betChoice: choice,
+                    }),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    setTxStatus(`🎉 Payout sent! +${formatPill(betAmount * 2)} $PILL`);
+                    console.log('[GAME] Payout receipt:', data.receipt);
+                } else {
+                    setTxStatus(`⚠️ Won but payout failed: ${data.error}`);
+                    console.error('[GAME] Payout error:', data);
+                }
             } catch (e: any) {
-                const msg = e?.message || 'Transfer failed';
-                setTxStatus(`❌ Transfer failed: ${msg.slice(0, 80)}`);
-                console.error('[GAME] Loss transfer failed:', e);
-                // Still count the game but note the transfer failed
+                setTxStatus(`⚠️ Won but payout request failed: ${e?.message?.slice(0, 60)}`);
+                console.error('[GAME] Payout fetch failed:', e);
             }
         } else {
-            setTxStatus('🎉 You won! PILL stays in your wallet.');
+            setTxStatus('💀 You lost. House keeps your bet.');
         }
 
-        // Update virtual balance from real balance
+        // Refresh balance
+        await bc.loadPillBalance();
         if (bc.pillInfo) {
-            const currentBal = Number(bc.pillInfo.balance / (10n ** BigInt(decimals)));
-            setVirtualBalance(currentBal);
+            const newBal = Number(bc.pillInfo.balance / (10n ** BigInt(decimals)));
+            setVirtualBalance(newBal);
         }
 
         setTotalWagered(tw => tw + betAmount);

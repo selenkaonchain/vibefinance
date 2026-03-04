@@ -10,23 +10,24 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "latest",
-    "react-dom": "latest",
-    "opnet": "rc",
-    "@btc-vision/transaction": "rc",
     "@btc-vision/bitcoin": "rc",
-    "@btc-vision/walletconnect": "latest"
+    "@btc-vision/transaction": "rc",
+    "@btc-vision/walletconnect": "latest",
+    "opnet": "rc",
+    "react": "latest",
+    "react-dom": "latest"
   },
   "devDependencies": {
-    "vite": "latest",
-    "@vitejs/plugin-react": "latest",
-    "vite-plugin-node-polyfills": "latest",
-    "typescript": "latest",
+    "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/node": "latest",
+    "@vercel/node": "^5.6.10",
+    "@vitejs/plugin-react": "latest",
     "crypto-browserify": "latest",
-    "stream-browserify": "latest"
+    "stream-browserify": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vite-plugin-node-polyfills": "latest"
   },
   "overrides": {
     "@noble/hashes": "2.0.1"
