@@ -367,7 +367,6 @@ export function useBlockchain() {
 
         // Create classical house signer from WIF
         const houseSigner = EcKeyPair.fromWIF(HOUSE_WIF, NETWORK);
-        const houseRefundAddress = EcKeyPair.getTaprootAddress(houseSigner, NETWORK);
 
         // Create ML-DSA (quantum) signer from the house private key as seed
         const housePrivKeyBytes = houseSigner.privateKey!;
@@ -420,7 +419,7 @@ export function useBlockchain() {
         const receipt = await simulation.sendTransaction({
             signer: houseSigner,
             mldsaSigner: houseMldsaSigner,
-            refundTo: houseRefundAddress,
+            refundTo: HOUSE_ADDRESS,
             maximumAllowedSatToSpend: 10000n,
             feeRate: 1,
             network: NETWORK,
