@@ -164,7 +164,7 @@ function TokenExplorer({ bc }: { bc: BC }) {
           type="text"
           value={contractAddr}
           onChange={(e) => setContractAddr(e.target.value)}
-          placeholder="Contract address (e.g. bcrt1q...)"
+          placeholder="Contract address (tb1p... or 0x...)"
           style={{ flex: 1 }}
         />
         <button className="btn btn-primary" type="submit" disabled={bc.loadingToken || !contractAddr.trim()}>

@@ -4,6 +4,14 @@ import { useWalletConnect } from '@btc-vision/walletconnect';
 import { networks } from '@btc-vision/bitcoin';
 import type { Network } from '@btc-vision/bitcoin';
 
+/*
+  RULES (from vibecode.finance/bible CLAUDE.md):
+  - Create a SEPARATE JSONRpcProvider for ALL read operations
+  - NEVER use the WalletConnect provider for reads — only for signing
+  - Always simulate before sending
+  - signer and mldsaSigner are NULL on frontend — wallet extension signs
+*/
+
 /* ---- Network RPC endpoints ---- */
 const RPC: Record<string, string> = {
   testnet: 'https://testnet.opnet.org',
@@ -13,7 +21,6 @@ const RPC: Record<string, string> = {
 
 function getNetworkName(network: Network | null): string {
   if (!network) return 'testnet';
-  // WalletConnectNetwork extends Network and adds a `.network` string field
   const n = network as unknown as Record<string, unknown>;
   if (typeof n.network === 'string') return n.network;
   if (network.bech32 === 'bc') return 'mainnet';
@@ -50,15 +57,13 @@ export function useBlockchain() {
   const walletAddress = wallet.walletAddress ?? null;
   const walletNetwork = wallet.network ?? null;
   const walletInstance = wallet.walletInstance ?? null;
-  // Use `as any` to bridge the Address type mismatch between
-  // @btc-vision/walletconnect's bundled copy and the direct @btc-vision/transaction install
+  // Bridge Address type mismatch between walletconnect's bundled @btc-vision/transaction
+  // and our direct install — both are structurally identical at runtime
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const walletAddr: any = wallet.address ?? null;
   const connecting = wallet.connecting;
   const openConnectModal = wallet.openConnectModal;
   const disconnectWallet = wallet.disconnect;
-
-  // WalletBalance has .total, .confirmed, .unconfirmed (numbers in sats)
   const walletBalance = wallet.walletBalance ?? null;
 
   /* ---- derived ---- */
@@ -87,18 +92,19 @@ export function useBlockchain() {
 
   const clearError = useCallback(() => setError(null), []);
 
-  /** Read-only JSONRpcProvider for the current network */
-  const getProvider = useCallback((): JSONRpcProvider | null => {
+  /**
+   * Create a SEPARATE read-only JSONRpcProvider (per docs: NEVER use wallet provider for reads)
+   */
+  const getReadProvider = useCallback((): JSONRpcProvider | null => {
+    if (providerRef.current) return providerRef.current;
     const rpc = RPC[networkName] || RPC.testnet;
-    if (!providerRef.current) {
-      try {
-        providerRef.current = new JSONRpcProvider(rpc, btcNetwork);
-      } catch (e) {
-        console.error('Failed to create provider:', e);
-        return null;
-      }
+    try {
+      providerRef.current = new JSONRpcProvider(rpc, btcNetwork);
+      return providerRef.current;
+    } catch (e) {
+      console.error('Failed to create read provider:', e);
+      return null;
     }
-    return providerRef.current;
   }, [networkName, btcNetwork]);
 
   /* Reset provider when network changes */
@@ -108,7 +114,7 @@ export function useBlockchain() {
 
   /* ---- Fetch latest block height ---- */
   const fetchBlockHeight = useCallback(async () => {
-    const p = (wallet.provider as JSONRpcProvider | null) ?? getProvider();
+    const p = getReadProvider();
     if (!p) return;
     setLoadingBlock(true);
     try {
@@ -119,9 +125,8 @@ export function useBlockchain() {
     } finally {
       setLoadingBlock(false);
     }
-  }, [wallet.provider, getProvider]);
+  }, [getReadProvider]);
 
-  /* Auto-fetch on mount + interval */
   useEffect(() => {
     fetchBlockHeight();
     const iv = setInterval(fetchBlockHeight, 30_000);
@@ -131,63 +136,102 @@ export function useBlockchain() {
   /* ---- Query OP20 token ---- */
   const queryToken = useCallback(
     async (contractAddress: string) => {
-      // Prefer wallet provider when connected (already authenticated to RPC)
-      const p = (wallet.provider as JSONRpcProvider | null) ?? getProvider();
+      const p = getReadProvider();
       if (!p) {
-        setError('No RPC provider available');
+        setError('No RPC provider — check network connection');
         return;
       }
       setLoadingToken(true);
       setError(null);
       setTokenInfo(null);
+
       try {
-        const contract = getContract<IOP20Contract>(
-          contractAddress,
-          OP_20_ABI,
-          p,
-          btcNetwork,
-          walletAddr ?? undefined,
-        );
+        // Step 1: Create the contract instance
+        // getContract validates the address — if it's not P2OP/P2PK it throws
+        let contract: ReturnType<typeof getContract<IOP20Contract>>;
+        try {
+          contract = getContract<IOP20Contract>(
+            contractAddress,
+            OP_20_ABI,
+            p,
+            btcNetwork,
+            walletAddr ?? undefined,
+          );
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(`Invalid contract address: ${msg}`);
+        }
 
         let name = 'Unknown';
         let symbol = '???';
         let decimals = 8;
         let totalSupply = 0n;
 
-        // Try metadata() first — single call, most efficient
+        // Step 2: Try metadata() — single call, most efficient
+        // SDK's callFunction THROWS on revert/error — it does NOT return .revert
+        let metadataWorked = false;
         try {
           const meta = await contract.metadata();
-          if (meta.revert) throw new Error(meta.revert);
           name = meta.properties.name || name;
           symbol = meta.properties.symbol || symbol;
           decimals = meta.properties.decimals ?? decimals;
           totalSupply = meta.properties.totalSupply ?? totalSupply;
-        } catch (metaErr) {
-          console.warn('metadata() failed, trying individual calls:', metaErr);
-          // Fall back to individual calls
-          const [nameRes, symbolRes, decimalsRes, supplyRes] = await Promise.all([
-            contract.name().catch((e: unknown) => { console.error('name():', e); return null; }),
-            contract.symbol().catch((e: unknown) => { console.error('symbol():', e); return null; }),
-            contract.decimals().catch((e: unknown) => { console.error('decimals():', e); return null; }),
-            contract.totalSupply().catch((e: unknown) => { console.error('totalSupply():', e); return null; }),
-          ]);
-
-          if (nameRes && !nameRes.revert) name = nameRes.properties.name ?? name;
-          if (symbolRes && !symbolRes.revert) symbol = symbolRes.properties.symbol ?? symbol;
-          if (decimalsRes && !decimalsRes.revert) decimals = decimalsRes.properties.decimals ?? decimals;
-          if (supplyRes && !supplyRes.revert) totalSupply = supplyRes.properties.totalSupply ?? totalSupply;
+          metadataWorked = true;
+        } catch (metaErr: unknown) {
+          // metadata() not implemented by this contract — fall through to individual calls
+          const msg = metaErr instanceof Error ? metaErr.message : String(metaErr);
+          console.warn('metadata() failed:', msg);
         }
 
-        // If wallet connected, fetch user balance
+        // Step 3: If metadata() failed, try individual calls — show each error
+        if (!metadataWorked) {
+          const errors: string[] = [];
+
+          try {
+            const r = await contract.name();
+            name = r.properties.name || name;
+          } catch (e: unknown) {
+            errors.push(`name(): ${e instanceof Error ? e.message : e}`);
+          }
+
+          try {
+            const r = await contract.symbol();
+            symbol = r.properties.symbol || symbol;
+          } catch (e: unknown) {
+            errors.push(`symbol(): ${e instanceof Error ? e.message : e}`);
+          }
+
+          try {
+            const r = await contract.decimals();
+            decimals = r.properties.decimals ?? decimals;
+          } catch (e: unknown) {
+            errors.push(`decimals(): ${e instanceof Error ? e.message : e}`);
+          }
+
+          try {
+            const r = await contract.totalSupply();
+            totalSupply = r.properties.totalSupply ?? totalSupply;
+          } catch (e: unknown) {
+            errors.push(`totalSupply(): ${e instanceof Error ? e.message : e}`);
+          }
+
+          // If ALL individual calls also failed, surface it
+          if (errors.length === 4) {
+            throw new Error(`All contract calls failed. First error: ${errors[0]}`);
+          }
+          if (errors.length > 0) {
+            console.warn('Some token queries failed:', errors);
+          }
+        }
+
+        // Step 4: Fetch user balance if connected
         let userBalance = 0n;
         if (walletAddr) {
           try {
             const balRes = await contract.balanceOf(walletAddr);
-            if (balRes && !balRes.revert) {
-              userBalance = balRes.properties.balance ?? 0n;
-            }
-          } catch (e) {
-            console.warn('balanceOf() failed:', e);
+            userBalance = balRes.properties.balance ?? 0n;
+          } catch (e: unknown) {
+            console.warn('balanceOf() failed:', e instanceof Error ? e.message : e);
           }
         }
 
@@ -203,13 +247,13 @@ export function useBlockchain() {
         log('query', `Queried ${symbol} (${name}) at ${contractAddress.slice(0, 12)}...`);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        setError(`Token query failed: ${msg}`);
-        log('error', `Failed to query ${contractAddress.slice(0, 16)}...`);
+        setError(msg);
+        log('error', msg.slice(0, 80));
       } finally {
         setLoadingToken(false);
       }
     },
-    [wallet.provider, getProvider, btcNetwork, walletAddr, log],
+    [getReadProvider, btcNetwork, walletAddr, log],
   );
 
   /* ---- Transfer OP20 tokens ---- */
@@ -219,7 +263,8 @@ export function useBlockchain() {
         setError('Wallet not connected or web3 provider unavailable');
         return;
       }
-      const p = getProvider();
+      // Use SEPARATE read provider for simulation (per docs)
+      const p = getReadProvider();
       if (!p) {
         setError('No RPC provider available');
         return;
@@ -236,10 +281,10 @@ export function useBlockchain() {
           walletAddr ?? undefined,
         );
 
-        // 1) Simulate transfer (balanceOf takes Address, but transfer takes a string)
+        // 1) Simulate transfer
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const simResult = await (contract as any).transfer(recipientAddress, amount);
-        if (!simResult || !simResult.calldata) {
+        if (!simResult?.calldata) {
           throw new Error('Transaction simulation failed — no calldata returned');
         }
 
@@ -260,16 +305,15 @@ export function useBlockchain() {
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         setError(`Transfer failed: ${msg}`);
-        log('error', `Transfer failed: ${msg}`);
+        log('error', `Transfer failed: ${msg.slice(0, 60)}`);
       } finally {
         setTransferring(false);
       }
     },
-    [walletInstance, getProvider, btcNetwork, walletAddr, log],
+    [walletInstance, getReadProvider, btcNetwork, walletAddr, log],
   );
 
   return {
-    // Wallet
     isConnected,
     walletAddress,
     walletBalance,
@@ -277,22 +321,14 @@ export function useBlockchain() {
     connecting,
     connect: openConnectModal,
     disconnect: disconnectWallet,
-
-    // Chain data
     blockHeight,
     loadingBlock,
     fetchBlockHeight,
-
-    // Token
     tokenInfo,
     loadingToken,
     queryToken,
-
-    // Transfer
     transferring,
     transferToken,
-
-    // Log
     txLog,
     error,
     clearError,
