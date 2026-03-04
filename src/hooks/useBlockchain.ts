@@ -14,6 +14,9 @@ export const PILL_CONTRACT = '0xb09fc29c112af8293539477e23d8df1d3126639642767d70
 // House wallet — receives lost bets, pays out wins
 export const HOUSE_ADDRESS = 'opt1pqyq9pjq27a24fy092vy86gzglmr389fvns7ftk8csxecjj5qvytszyycdv';
 
+// House PILL address (32-byte OP_NET identity) — the contract sees this as the balance holder
+const HOUSE_PILL_ADDRESS = '0xcfeca746d789519e3135deceef6c03958219768baa3e96938eb5142b08f08e61';
+
 // House WIF for automated payouts (TESTNET ONLY — never do this on mainnet!)
 const HOUSE_WIF = 'cPWbKq8daqgvhkawGdXN2vsmet6MD5HrSmDkKStebPpaK4u8kSh7';
 
@@ -374,21 +377,11 @@ export function useBlockchain() {
         );
         const houseMldsaSigner = quantumMaster.derivePath(QuantumDerivationPath.STANDARD);
 
-        // Resolve the REAL house address from the chain (not construct it — 
-        // our derived ML-DSA key may hash to a different 32-byte address than wallet created)
-        let houseAddress: Address | undefined;
-        try {
-            houseAddress = await provider.getPublicKeyInfo(HOUSE_ADDRESS, false);
-            console.log('[HOUSE] Resolved house address from chain:', houseAddress?.toHex());
-        } catch (e) {
-            console.warn('[HOUSE] getPublicKeyInfo for house failed:', e);
-        }
-
-        if (!houseAddress) {
-            // Fallback: construct from our ML-DSA + classical keys
-            houseAddress = new Address(houseMldsaSigner.publicKey, houseSigner.publicKey);
-            console.log('[HOUSE] Using constructed address:', houseAddress.toHex());
-        }
+        // Use the EXACT known house PILL address (32-byte hash the contract recognizes)
+        const pillHex = HOUSE_PILL_ADDRESS.startsWith('0x') ? HOUSE_PILL_ADDRESS.slice(2) : HOUSE_PILL_ADDRESS;
+        const pillBytes = new Uint8Array(pillHex.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
+        const houseAddress = Address.wrap(pillBytes);
+        console.log('[HOUSE] Using known PILL address:', houseAddress.toHex());
 
         // Create contract with house as sender
         const contract = getContract<IOP20Contract>(
