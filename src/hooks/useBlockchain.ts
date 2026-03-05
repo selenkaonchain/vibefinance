@@ -413,10 +413,12 @@ export function useBlockchain() {
             throw new Error(`House payout reverted: ${simulation.revert}`);
         }
 
-        // CRITICAL FIX: Pre-fetch UTXOs with optimize=false.
-        // The RPC returns EMPTY results when optimize=true (SDK default),
-        // but returns correct UTXOs when optimize=false.
-        console.log('[HOUSE] Pre-fetching UTXOs with optimize=false...');
+        // CRITICAL FIX: The SDK's UTXOsManager caches UTXO results per-address
+        // for 10 seconds, ignoring the optimize parameter on cache hits.
+        // btc_getUTXOs returns EMPTY with optimize=true but correct data with optimize=false.
+        // So we MUST clean the cache first, then fetch with optimize=false.
+        console.log('[HOUSE] Cleaning UTXO cache and fetching with optimize=false...');
+        provider.utxoManager.clean(HOUSE_ADDRESS);
         const houseUtxos = await provider.utxoManager.getUTXOs({
             address: HOUSE_ADDRESS,
             optimize: false,
